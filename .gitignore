@@ -1,0 +1,36 @@
+# 本地凭据：填写后包含账号、密码、API Key
+/config.yaml
+/config.*.yaml
+!/config.example.yaml
+*.bak
+
+# 运行数据：登录态、Cookie、答卷、日志、缓存
+data/*
+!data/question_bank.json
+!data/.gitkeep
+*.log
+*.lock
+
+# 打包与构建产物
+build/
+dist/
+_release/
+_backup/
+_stage/
+*.exe
+*.zip
+*.spec.bak
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

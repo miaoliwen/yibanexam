@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>yooc 考试助手</title>
+<style>
+  :root{
+    --bg:#0b0f14; --panel:#121a22; --panel2:#182230; --border:#22303f;
+    --text:#e6edf3; --muted:#7d8b9c; --accent:#22d3ee; --accent2:#10b981;
+    --danger:#f43f5e; --warn:#f59e0b;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg); color:var(--text); overflow:hidden;
+    font-family:"Segoe UI","Microsoft YaHei",-apple-system,sans-serif;
+    font-size:14px; -webkit-font-smoothing:antialiased;
+  }
+  /* 顶部 */
+  header{
+    height:58px; display:flex; align-items:center; gap:12px; padding:0 20px;
+    border-bottom:1px solid var(--border); background:var(--panel);
+    -webkit-app-region:drag; user-select:none;
+  }
+  .logo{
+    width:30px;height:30px;border-radius:9px;display:grid;place-items:center;
+    background:linear-gradient(135deg,#22d3ee,#3b82f6);font-weight:700;font-size:15px;color:#04121a;
+  }
+  .title{font-size:15px;font-weight:600;letter-spacing:.2px}
+  .subtitle{font-size:11.5px;color:var(--muted);margin-top:1px}
+  .spacer{flex:1}
+  .status{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted);
+    padding:6px 12px;border:1px solid var(--border);border-radius:20px;background:var(--panel2)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--muted);transition:.3s}
+  .dot.idle{background:#4b5a6b}
+  .dot.run{background:var(--accent);box-shadow:0 0 0 0 rgba(34,211,238,.6);animation:pulse 1.6s infinite}
+  .dot.ok{background:var(--accent2)}
+  .dot.err{background:var(--danger)}
+  @keyframes pulse{
+    0%{box-shadow:0 0 0 0 rgba(34,211,238,.5)}
+    70%{box-shadow:0 0 0 7px rgba(34,211,238,0)}
+    100%{box-shadow:0 0 0 0 rgba(34,211,238,0)}
+  }
+
+  /* 主体 */
+  main{height:calc(100% - 58px);display:grid;grid-template-columns:400px 1fr;overflow:hidden}
+  .left{
+    border-right:1px solid var(--border); padding:14px; overflow-y:auto;
+    display:flex; flex-direction:column; gap:10px;
+  }
+  .left::-webkit-scrollbar,.log::-webkit-scrollbar{width:9px}
+  .left::-webkit-scrollbar-thumb,.log::-webkit-scrollbar-thumb{
+    background:#243040;border-radius:5px;border:2px solid var(--bg)}
+
+  .card{
+    background:var(--panel); border:1px solid var(--border); border-radius:12px;
+    padding:12px 14px;
+  }
+  .card h3{
+    font-size:12px; font-weight:600; color:var(--muted); letter-spacing:.8px;
+    text-transform:uppercase; margin-bottom:9px; display:flex; align-items:center; gap:7px;
+  }
+  .card h3::before{content:'';width:3px;height:12px;border-radius:2px;
+    background:linear-gradient(180deg,var(--accent),#3b82f6)}
+
+  .field{margin-bottom:8px}
+  .field:last-child{margin-bottom:0}
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px}
+  input,select{
+    width:100%; height:34px; padding:0 11px; border-radius:8px;
+    background:#0d141c; border:1px solid var(--border); color:var(--text);
+    font-size:13px; font-family:inherit; outline:none; transition:.18s;
+  }
+  input:focus,select:focus{border-color:var(--accent);background:#0f1822;
+    box-shadow:0 0 0 3px rgba(34,211,238,.1)}
+  input::placeholder{color:#4b5a6b}
+  select{cursor:pointer;appearance:none;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'><path d='M3 4.5L6 7.5L9 4.5' stroke='%237d8b9c' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>");
+    background-repeat:no-repeat;background-position:right 11px center;padding-right:30px}
+
+  .row{display:flex;gap:9px}
+  .row>*{flex:1}
+
+  .chk{display:flex;align-items:center;gap:8px;margin-top:10px;cursor:pointer;user-select:none}
+  .chk input{width:16px;height:16px;flex:none;margin:0;accent-color:var(--accent);cursor:pointer}
+  .chk span{font-size:12.5px;color:var(--muted);line-height:1.4}
+
+  /* 按钮 */
+  .btn{
+    height:38px; border:none; border-radius:9px; font-size:13.5px; font-weight:600;
+    font-family:inherit; cursor:pointer; transition:.18s; display:flex;
+    align-items:center; justify-content:center; gap:6px; white-space:nowrap;
+  }
+  .btn:disabled{opacity:.4;cursor:not-allowed}
+  .btn-primary{background:linear-gradient(135deg,var(--accent),#3b82f6);color:#04121a}
+  .btn-primary:hover:not(:disabled){filter:brightness(1.12);transform:translateY(-1px);
+    box-shadow:0 5px 16px rgba(34,211,238,.25)}
+  .btn-ghost{background:var(--panel2);color:var(--text);border:1px solid var(--border)}
+  .btn-ghost:hover:not(:disabled){background:#1e2a38;border-color:#2f4256}
+  .btn-danger{background:rgba(244,63,94,.12);color:#fb7185;border:1px solid rgba(244,63,94,.35)}
+  .btn-danger:hover:not(:disabled){background:rgba(244,63,94,.2)}
+  .btn-sm{height:32px;font-size:12.5px;padding:0 12px;flex:none}
+
+  /* 右侧 */
+  .right{display:flex;flex-direction:column;overflow:hidden;background:#0a0e13}
+  .bar{
+    padding:12px 18px; border-bottom:1px solid var(--border);
+    display:flex; align-items:center; gap:12px; background:var(--panel);
+  }
+  .bar-title{font-size:12px;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;font-weight:600}
+  .progress-wrap{flex:1;display:flex;align-items:center;gap:10px}
+  .track{flex:1;height:6px;border-radius:3px;background:#1a2530;overflow:hidden}
+  .fill{height:100%;width:0;border-radius:3px;
+    background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .35s ease}
+  .pct{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:38px;text-align:right}
+
+  .log{
+    flex:1; overflow-y:auto; padding:14px 18px;
+    font-family:"Cascadia Code","Consolas","Menlo",monospace;
+    font-size:12.5px; line-height:1.75;
+  }
+  .line{display:flex;gap:9px;align-items:flex-start;animation:fade .2s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+  .ts{color:#3d4d5e;flex:none;font-size:11.5px;padding-top:1px}
+  .msg{white-space:pre-wrap;word-break:break-word;color:#b8c4d0}
+  .lv-ok .msg{color:var(--accent2)}
+  .lv-err .msg{color:#fb7185}
+  .lv-warn .msg{color:var(--warn)}
+  .lv-accent .msg{color:var(--accent)}
+  .empty{color:#3d4d5e;text-align:center;padding-top:60px;font-family:inherit;font-size:13px}
+
+  /* 弹层 */
+  .toast{
+    position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(80px);
+    background:var(--panel2);border:1px solid var(--border);color:var(--text);
+    padding:11px 20px;border-radius:10px;font-size:13px;opacity:0;
+    transition:.3s cubic-bezier(.2,.8,.3,1);pointer-events:none;z-index:99;
+    box-shadow:0 10px 30px rgba(0,0,0,.5);
+  }
+  .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+  .toast.ok{border-color:rgba(16,185,129,.5)}
+  .toast.err{border-color:rgba(244,63,94,.5)}
+
+  .hint{font-size:11.5px;color:#546274;line-height:1.6;margin-top:7px}
+  .kbd{background:#1a2530;border:1px solid var(--border);border-radius:4px;
+    padding:1px 5px;font-size:11px;font-family:monospace}
+
+  /* ---- 答题卡（人工核验/编辑） ---- */
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.66);display:none;z-index:60;padding:36px}
+  .modal.show{display:flex}
+  .modal-box{background:var(--panel);border:1px solid var(--border);border-radius:14px;
+    width:100%;max-width:1120px;margin:auto;display:flex;flex-direction:column;max-height:100%}
+  .modal-head{display:flex;align-items:center;gap:9px;padding:12px 16px;
+    border-bottom:1px solid var(--border);flex-wrap:wrap}
+  .modal-head .spacer{flex:1}
+  .sheet-stat{font-size:12px;color:var(--muted)}
+  .modal-body{overflow:auto;padding:6px 16px 18px}
+  .sheet-item{border-bottom:1px solid var(--border);padding:12px 0}
+  .sheet-item:last-child{border-bottom:none}
+  .sheet-q{font-size:13.5px;line-height:1.65;margin-bottom:6px}
+  .sheet-meta{font-size:11.5px;color:var(--muted);margin-bottom:7px;line-height:1.6}
+  .tag{display:inline-block;padding:1px 7px;border-radius:6px;font-size:11px;
+    border:1px solid var(--border);margin-right:5px;color:var(--muted)}
+  .tag.ok{color:var(--accent2);border-color:rgba(16,185,129,.4)}
+  .tag.warn{color:var(--warn);border-color:rgba(245,158,11,.4)}
+  .tag.edit{color:var(--accent);border-color:rgba(34,211,238,.4)}
+  .opt{display:inline-block;margin:3px 7px 3px 0;padding:5px 11px;border:1px solid var(--border);
+    border-radius:8px;cursor:pointer;font-size:12.5px;user-select:none;transition:.15s}
+  .opt:hover{border-color:var(--accent)}
+  .opt.on{background:rgba(34,211,238,.14);border-color:var(--accent);color:var(--accent)}
+  .sheet-input{width:100%;height:34px;padding:0 11px;border-radius:8px;background:#0d141c;
+    border:1px solid var(--border);color:var(--text);font-size:13px;font-family:inherit;outline:none}
+  .sheet-input:focus{border-color:var(--accent)}
+  .sheet-locked{padding:24px;text-align:center;color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Y</div>
+  <div>
+    <div class="title">yooc 考试助手</div>
+    <div class="subtitle">接口级自动化 · 大模型答题</div>
+  </div>
+  <div class="spacer"></div>
+  <div class="status"><span class="dot idle" id="dot"></span><span id="statusText">就绪</span></div>
+  <button class="btn btn-ghost btn-sm" onclick="reopenPage()">重新打开页面</button>
+  <button class="btn btn-ghost btn-sm" onclick="quitApp()">退出</button>
+</header>
+
+<main>
+  <!-- 左：配置 -->
+  <div class="left">
+
+    <div class="card">
+      <h3>账号</h3>
+      <div class="field">
+        <label>手机号</label>
+        <input id="username" placeholder="请输入手机号" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>密码</label>
+        <input id="password" type="password" placeholder="登录密码" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>课群 ID <span style="color:#f43f5e">*</span></label>
+        <input id="group_id" placeholder="考试页 URL 里 /group/ 后的数字，如 12345678">
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn btn-ghost btn-sm" onclick="testLogin()">测试登录</button>
+        <button class="btn btn-ghost btn-sm" onclick="saveCfg()">保存配置</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>大模型</h3>
+      <div class="field">
+        <label>接口地址</label>
+        <input id="base_url" placeholder="https://api.deepseek.com/v1">
+      </div>
+      <div class="field">
+        <label>API Key</label>
+        <input id="api_key" type="password" placeholder="sk-...">
+      </div>
+      <div class="field">
+        <label>模型名</label>
+        <input id="model" placeholder="deepseek-flash">
+      </div>
+      <label class="chk" for="search_enabled">
+        <input type="checkbox" id="search_enabled">
+        <span>答不确定的题时联网搜索核实</span>
+      </label>
+    </div>
+
+    <div class="card">
+      <h3>考试</h3>
+      <div class="row" style="align-items:center">
+        <select id="examSelect">
+          <option value="">— 先测试登录，再刷新 —</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" style="flex:none" onclick="refreshExams()">
+          刷新
+        </button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>执行</h3>
+      <div class="field">
+        <label>答题节奏（秒/题）</label>
+        <input id="pace" placeholder="34" value="34">
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn btn-primary" id="btnDry" onclick="runExam(false)">
+          演练
+        </button>
+        <button class="btn btn-danger" id="btnLive" onclick="runExam(true)">
+          正式交卷
+        </button>
+      </div>
+      <button class="btn btn-ghost btn-sm" style="width:100%;margin-top:8px"
+              onclick="openSheet()">答题卡（人工核验 / 改答案）</button>
+      <button class="btn btn-ghost btn-sm" style="width:100%;margin-top:8px"
+              onclick="call('/api/open-data', {})">打开数据目录</button>
+      <div class="hint">
+        先「演练」确认答案，再「正式交卷」。
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 右：日志 -->
+  <div class="right">
+    <div class="bar">
+      <span class="bar-title">运行日志</span>
+      <div class="progress-wrap">
+        <div class="track"><div class="fill" id="fill"></div></div>
+        <span class="pct" id="pct">0%</span>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="clearLog()">清空</button>
+    </div>
+    <div class="log" id="log">
+      <div class="empty">等待开始…</div>
+    </div>
+  </div>
+</main>
+
+<div class="modal" id="sheetModal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <span style="font-weight:600">答题卡</span>
+      <span class="sheet-stat" id="sheetStat"></span>
+      <div class="spacer"></div>
+      <button class="btn btn-ghost btn-sm" onclick="saveSheet()">保存修改</button>
+      <button class="btn btn-danger btn-sm" onclick="submitFromSheet()">正式交卷</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeSheet()">关闭</button>
+    </div>
+    <div class="modal-body" id="sheetBody">
+      <div class="sheet-locked">加载中…</div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let busy = false;
+let logCursor = 0;
+let doneShown = false;
+
+const $ = id => document.getElementById(id);
+
+// 本地服务鉴权 token：exe 启动时通过 URL ?t=... 传入，刷新后从 sessionStorage 恢复。
+// 没有它的请求一律 403 —— 防止本机其它进程/网页 POST /api/run 触发真交卷。
+const API_TOKEN = (() => {
+  try {
+    const u = new URL(location.href);
+    const t = u.searchParams.get('t');
+    if (t) {
+      sessionStorage.setItem('yooc_token', t);
+      history.replaceState({}, '', '/');
+      return t;
+    }
+    return sessionStorage.getItem('yooc_token') || '';
+  } catch (e) { return ''; }
+})();
+
+async function call(path, body){
+  const opt = { headers: {'Content-Type':'application/json', 'X-Yooc-Token': API_TOKEN} };
+  if (body !== undefined){ opt.method = 'POST'; opt.body = JSON.stringify(body); }
+  try {
+    const r = await fetch(path, opt);
+    const txt = await r.text();
+    if (r.status === 403) return { ok:false, msg:'本地服务鉴权失败：请从启动时弹出的窗口重新打开页面' };
+    try { return JSON.parse(txt); }
+    catch(e){ return { ok:false, msg:'服务返回了非 JSON 内容：' + txt.slice(0, 120) }; }
+  } catch(e){
+    // 服务没响应/已退出。绝对不能静默返回 undefined，否则调用方会卡在半路
+    return { ok:false, msg:'无法连接本地服务，程序可能已退出' };
+  }
+}
+
+function toast(msg, type){
+  const t = $('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + (type || '');
+  clearTimeout(t._t);
+  t._t = setTimeout(() => { t.className = 'toast ' + (type||''); }, 2600);
+}
+
+function setStatus(kind, text){
+  $('dot').className = 'dot ' + kind;
+  $('statusText').textContent = text;
+}
+
+function setBusy(v, label){
+  busy = v;
+  ['btnDry','btnLive'].forEach(id => $(id).disabled = v);
+  if (v) setStatus('run', label || '运行中');
+}
+
+// ---- 渲染 ----
+window.__log = function(msg, level){
+  const box = $('log');
+  const empty = box.querySelector('.empty');
+  if (empty) empty.remove();
+  const d = new Date();
+  const ts = String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')
+           + ':' + String(d.getSeconds()).padStart(2,'0');
+  const el = document.createElement('div');
+  el.className = 'line lv-' + (level || 'info');
+  el.innerHTML = '<span class="ts">'+ts+'</span><span class="msg"></span>';
+  el.querySelector('.msg').textContent = msg;
+  box.appendChild(el);
+  box.scrollTop = box.scrollHeight;
+};
+
+window.__progress = function(pct, text){
+  if (typeof pct === 'number'){
+    $('fill').style.width = Math.max(0, Math.min(100, pct)) + '%';
+    $('pct').textContent = Math.round(pct) + '%';
+  }
+};
+
+window.__done = function(ok, msg){
+  if (doneShown) return;
+  doneShown = true;
+  setBusy(false);
+  setStatus(ok ? 'ok' : 'err', msg || (ok ? '完成' : '失败'));
+  if (msg) toast(msg, ok ? 'ok' : 'err');
+};
+
+function clearLog(){
+  $('log').innerHTML = '<div class="empty">等待开始…</div>';
+  $('fill').style.width = '0%'; $('pct').textContent = '0%';
+  doneShown = false;
+}
+
+// ---- 日志轮询（替代 pywebview 的推送）----
+async function pollLogs(){
+  try{
+    const d = await call('/api/logs?since=' + logCursor);
+    (d.lines || []).forEach(item => window.__log(item[0], item[1]));
+    logCursor = d.total || 0;
+    if (typeof d.progress === 'number') window.__progress(d.progress);
+    if (d.done) window.__done(d.done.ok, d.done.msg);
+  }catch(e){ /* 服务已退出 */ }
+  setTimeout(pollLogs, 600);
+}
+
+// ---- 表单 ----
+function formData(){
+  return {
+    username: $('username').value.trim(),
+    password: $('password').value,
+    group_id: $('group_id').value.trim(),
+    base_url: $('base_url').value.trim(),
+    api_key: $('api_key').value.trim(),
+    model: $('model').value.trim(),
+    search_enabled: $('search_enabled').checked,
+    pace: $('pace').value.trim(),
+  };
+}
+
+function fillForm(s){
+  $('username').value = s.username || '';
+  $('group_id').value = s.group_id || '';
+  $('base_url').value = s.base_url || '';
+  $('model').value = s.model || '';
+  $('pace').value = s.pace || '34';
+  $('search_enabled').checked = s.search_enabled !== false;
+
+  // 密码框常被浏览器密码管理器清空，用占位符提示"已经存过了"
+  const pwd = $('password');
+  pwd.value = s.password || '';
+  if (!pwd.value && s.has_password) pwd.placeholder = '已保存 · 留空则沿用';
+
+  const key = $('api_key');
+  key.value = s.api_key || '';
+  if (!key.value && s.has_api_key) key.placeholder = '已保存 · 留空则沿用';
+}
+
+async function saveCfg(silent){
+  const r = await call('/api/save', formData());
+  if (!silent) toast(r.ok ? '配置已保存' : r.msg, r.ok ? 'ok' : 'err');
+  return r.ok;
+}
+
+async function testLogin(){
+  if (busy) return;
+  setBusy(true, '登录中');
+  window.__log('开始测试登录…', 'accent');
+  try {
+    const r = await call('/api/login', formData());
+    window.__log(r.msg, r.ok ? 'ok' : 'err');
+    setStatus(r.ok ? 'ok' : 'err', r.ok ? '已登录' : '登录失败');
+    if (r.ok) await refreshExams();
+  } catch(e) {
+    window.__log('登录流程异常：' + e, 'err');
+    setStatus('err', '异常');
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function refreshExams(){
+  setBusy(true, '拉取考试');
+  window.__log('获取考试列表…', 'accent');
+  try {
+    const r = await call('/api/exams', formData());
+    if (!r.ok){
+      window.__log(r.msg, 'err');
+      setStatus('err','失败');
+      toast(r.msg, 'err');
+      return;
+    }
+    const sel = $('examSelect');
+    sel.innerHTML = '';
+    r.exams.forEach(e => {
+      const o = document.createElement('option');
+      o.value = e.id;
+      o.textContent = e.title + '  (' + e.info + ')';
+      sel.appendChild(o);
+    });
+    window.__log('发现 ' + r.exams.length + ' 场考试', 'ok');
+    setStatus('ok', '就绪');
+  } catch(e) {
+    window.__log('获取考试异常：' + e, 'err');
+    setStatus('err','异常');
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function runExam(live){
+  if (busy) return;
+  if (!await saveCfg(true)) { toast('配置保存失败','err'); return; }
+  const examId = $('examSelect').value || (sheetData && sheetData.exam_id) || '';
+  if (!examId){ toast('请先刷新并选择考试','err'); return; }
+  if (live && !confirm('确认正式交卷？\n\n这会消耗考试机会，且不可撤销。')) return;
+
+  clearLog();
+  logCursor = 0;
+  setBusy(true, live ? '正式答题' : '演练中');
+  window.__log(live ? '=== 正式模式 ===' : '=== 演练模式（不交卷）===', 'accent');
+  const r = await call('/api/run', { ...formData(), exam_id: examId, live: live });
+  if (!r.ok){ window.__log(r.msg,'err'); setBusy(false); setStatus('err','失败'); }
+}
+
+
+// ================= 答题卡（人工核验 / 编辑 / 交卷） =================
+let sheetData = null;
+let sheetEdits = {};
+
+function esc(s){
+  return String(s == null ? '' : s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+async function openSheet(){
+  $('sheetModal').classList.add('show');
+  $('sheetBody').innerHTML = '<div class="sheet-locked">加载中…</div>';
+  const r = await call('/api/sheet');
+  if (!r || !r.ok){
+    $('sheetBody').innerHTML = '<div class="sheet-locked">' + esc((r && r.msg) || '读取失败') + '</div>';
+    return;
+  }
+  sheetData = r;
+  sheetEdits = {};
+  renderSheet();
+}
+
+function closeSheet(){ $('sheetModal').classList.remove('show'); }
+
+function curAnswer(it){
+  const e = sheetEdits[it.qid];
+  if (e) return { answer: (e.answer || []).slice(), text: e.text || '' };
+  return { answer: (it.answer || []).slice(), text: it.text || '' };
+}
+
+function renderSheet(){
+  const items = (sheetData && sheetData.items) || [];
+  const box = $('sheetBody');
+  const editable = sheetData.editable !== false;
+  $('sheetStat').textContent =
+    items.length + ' 题 · 已核实 ' + (sheetData.verified_count || 0) + ' 题' +
+    (editable ? '' : ' · 已锁定（不可修改）');
+  if (!items.length){
+    box.innerHTML = '<div class="sheet-locked">还没有答题卡：先跑一次答题流程</div>';
+    return;
+  }
+
+  box.innerHTML = items.map(it => {
+    const a = curAnswer(it);
+    const tags = [];
+    if (it.edited) tags.push('<span class="tag edit">人工改过</span>');
+    if (it.search_checked) tags.push('<span class="tag ok">已搜索核实</span>');
+    else if (it.verified) tags.push('<span class="tag ok">已核实</span>');
+    else tags.push('<span class="tag warn">未核实</span>');
+    if (it.reason) tags.push('<span class="tag">' + esc(it.reason).slice(0, 64) + '</span>');
+
+    let input;
+    if (it.options && it.options.length){
+      const chosen = a.answer.map(x => String(x).toUpperCase());
+      input = it.options.map(o => {
+        const on = chosen.includes(String(o.key).toUpperCase());
+        return '<span class="opt ' + (on ? 'on' : '') + '" data-qid="' + esc(it.qid) +
+               '" data-key="' + esc(o.key) + '">' + esc(o.key) + '. ' + esc(o.text) + '</span>';
+      }).join('');
+    } else {
+      input = '<input class="sheet-input" data-qid="' + esc(it.qid) + '" value="' +
+              esc(a.text) + '" placeholder="填写答案文本">';
+    }
+    return '<div class="sheet-item">' +
+      '<div class="sheet-q">' + esc(it.index) + '. ' + esc(it.stem) + '</div>' +
+      '<div class="sheet-meta">' + tags.join('') +
+      ' 置信度 ' + Math.round((it.confidence || 0) * 100) + '%</div>' +
+      '<div>' + input + '</div></div>';
+  }).join('');
+
+  box.querySelectorAll('.opt').forEach(el => { el.onclick = () => toggleOpt(el); });
+  box.querySelectorAll('.sheet-input').forEach(el => {
+    el.oninput = () => {
+      const qid = el.dataset.qid;
+      const it = items.find(x => String(x.qid) === String(qid));
+      if (!it) return;
+      const cur = curAnswer(it);
+      cur.text = el.value;
+      sheetEdits[qid] = cur;
+    };
+  });
+  if (!editable){
+    box.querySelectorAll('.opt,.sheet-input').forEach(el => {
+      el.style.pointerEvents = 'none';
+      el.style.opacity = '.55';
+    });
+  }
+}
+
+function toggleOpt(el){
+  const qid = el.dataset.qid, key = String(el.dataset.key || '').toUpperCase();
+  const items = (sheetData && sheetData.items) || [];
+  const it = items.find(x => String(x.qid) === String(qid));
+  if (!it) return;
+  const cur = curAnswer(it);
+  const multi = it.qtype === 'multi';
+  let arr = (cur.answer || []).map(x => String(x).toUpperCase());
+  if (multi){
+    arr = arr.includes(key) ? arr.filter(k => k !== key) : arr.concat([key]);
+  } else {
+    arr = arr.includes(key) ? [] : [key];
+  }
+  cur.answer = arr;
+  sheetEdits[qid] = cur;
+  document.querySelectorAll('.opt[data-qid="' + qid + '"]').forEach(o => {
+    o.classList.toggle('on', arr.includes(String(o.dataset.key).toUpperCase()));
+  });
+}
+
+async function saveSheet(){
+  const n = Object.keys(sheetEdits).length;
+  if (!n){ toast('没有修改'); return; }
+  const r = await call('/api/sheet', { edits: sheetEdits });
+  if (!r.ok){ toast(r.msg || '保存失败', 'err'); return; }
+  toast('已保存 ' + (r.changed || 0) + ' 题修改', 'ok');
+  sheetEdits = {};
+  await openSheet();
+}
+
+async function submitFromSheet(){
+  if (Object.keys(sheetEdits).length){
+    const s = await call('/api/sheet', { edits: sheetEdits });
+    if (!s.ok){ toast(s.msg || '保存失败', 'err'); return; }
+    sheetEdits = {};
+  }
+  if (!confirm('确认按当前答题卡正式交卷？\n\n会消耗考试机会，不可撤销。')) return;
+  closeSheet();
+  await runExam(true);
+}
+
+// 手动再拉一次浏览器：自动唤起失败时的兜底
+function reopenPage(){
+  try { call('/api/reopen', {}); } catch(e){}
+}
+
+async function quitApp(){
+  if (!confirm('确定退出程序？')) return;
+  try { await call('/api/quit', {}); } catch(e){}
+  window.close();
+}
+
+// ---- 启动 ----
+async function init(){
+  if (!API_TOKEN){
+    window.__log('缺少本地服务令牌：请从程序启动时自动打开的那个页面进入，或重启程序。', 'err');
+    setStatus('err','未授权');
+    return;
+  }
+  try{
+    const s = await call('/api/state');
+    fillForm(s);
+    window.__log('界面就绪，配置已加载', 'ok');
+    setStatus('idle','就绪');
+  }catch(e){
+    window.__log('初始化失败：'+e, 'err');
+  }
+  pollLogs();
+}
+init();
+</script>
+</body>
+</html>

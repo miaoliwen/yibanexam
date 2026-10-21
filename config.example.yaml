@@ -1,0 +1,235 @@
+account:
+  # 账号隔离键（可选）：留空则自动用 username 推导，例如 13800138000。
+  # 同一个键 = 同一套 profile / 凭据 / 断点 / 运行锁；换键就是换账号，互不影响。
+  # 需要让两个不同手机号共用一份目录时才手工指定它。
+  profile_key: ""
+
+  # 持久化浏览器目录：写通道（页面内 fetch）会复用它。
+  # 留空或保持默认值 = 自动按账号隔离到 data/profiles/<profile_key>/browser_profile
+  # 只有想把 profile 放到别处时才填绝对路径。
+  profile_dir: ./data/browser_profile
+
+  # 来自考试页 URL：https://exam.yooc.me/group/<groupId>/exams
+  group_id: 12345678
+
+  # 浏览器可执行文件路径；留空则自动找 Chrome / Edge / 内置 Chromium
+  # Windows 示例：C:\Program Files\Google\Chrome\Application\chrome.exe
+  browser_path: null
+
+  # ---- 登录方式 ----
+  # password : 纯 HTTP 直连登录接口，最快（推荐）
+  # browser  : 打开真实浏览器手动登录
+  # auto     : 先用账号密码，失败再开浏览器
+  login_mode: password
+  username: ""      # 登录手机号
+  password: ""      # 明文保存，注意不要把这个文件发给别人
+
+  # 复用当前账号目录下的 session.json 里的凭据，避免反复登录触发平台限频
+  reuse_session: true
+
+  # 登录传输通道：
+  #   auto    —— 有浏览器就先用浏览器提交登录表单（真实 TLS/登录页资源/Cookie），
+  #              失败再回退 requests 直连；最接近真实用户
+  #   http    —— 只走 requests 直连登录接口（快，但传输指纹是 Python）
+  #   browser —— 必须浏览器表单登录，失败即停
+  login_transport: auto
+
+  # 写操作（start / submit / repeat）的通道：
+  #   auto   —— 起一个无头浏览器用页面内 fetch（真实 TLS/HTTP2/风控 SDK 环境），
+  #             起不来就回退纯 HTTP
+  #   always —— 必须走浏览器，起不来直接失败
+  #   never  —— 全部走纯 HTTP（最不稳，仅排障用）
+  browser_for_writes: auto
+
+  headless: false          # browser 模式首次登录必须 false；登录成功后可改 true
+  slow_mo_ms: 0            # 每步操作额外延迟（调试用）
+
+  # 本地登录熔断：窗口期内最多尝试几次密码登录，防止把自己账号打到限频
+  login_max_attempts: 6
+  login_window_seconds: 600
+  login_min_interval_seconds: 8
+
+exam:
+  # 留空且列表只有一场时自动选择；多场时必须用 --exam-id/--keyword，
+  # 或显式打开下面的 auto_select_first（避免开错考试）
+  exam_id: null
+  exam_name_keyword: null
+  # 未指定 exam_id/keyword 时，列表里有多场考试是否允许自动选第一场。
+  # 默认 false（多场时停下，避免开错考试）。
+  auto_select_first: false
+
+  auto_submit: true        # 答完后是否自动交卷
+  # staged 流程下建议 true：答完停在交卷前，等人工在答题卡上核验、改答案后再交卷
+  manual_review: true
+  # ⚠ 演练模式（默认）现在**不会**开考：
+  #   没有作答记录时只做只读预检（登录 / 列表 / 设置），绝不调用 start/action。
+  #   要真正走「开考 → 答题 → 不提交」，加 --start-dry-run 或把下面改成 true。
+  #   注意：每人只有一次机会，演练开考会占用本次作答机会（可在同一次记录上继续 --live）。
+  dry_run: true
+  allow_start_in_dry_run: false
+  submit_review_seconds: 8 # 交卷前停留观察的秒数（会在 0.6~1.45 倍间随机）
+
+  # ---- 断点续跑 / 单次机会保护 ----
+  resume: true             # 检测到未完成作答记录时复用 examuserId，绝不重新开考
+  # 上次交卷结果未知时，是否允许再次自动交卷；默认 false（避免重复提交）
+  force_resubmit: false
+  # 距截止留多少秒安全垫（最后一次心跳 / 交卷）
+  deadline_margin_seconds: 120
+  # 剩余时间少于该值时停止答题，直接交卷
+  min_seconds_before_submit: 45
+  # 单场最大答题预算（秒）；0 = 只受截止时间约束
+  max_solve_seconds: 0
+
+  # ---- 到点自动开考 ----
+  # false（默认）：开考时间没到就报错退出，到点你自己重跑。
+  # true：进程挂起等待，到点自动调用 start/action 开考，全程无人值守。
+  #       只在时间窗上等待，不额外请求接口；到点后才真正开考。
+  #       注意：它不会替你跳过 dry_run —— 演练模式下仍只做只读预检。
+  auto_start: false
+  # 自动开考的目标时刻。留空/auto = 用考试列表里的 started 字段。
+  # 也可填 "2026-10-19 00:00:00" 或 "08:30"（当天，时间已过则算次日）。
+  start_at: auto
+  # 最长等待多少分钟；超过就报错退出，避免填错时间后无限挂着。
+  auto_start_max_wait_minutes: 240
+  # 等待期间多久报一次进度（只影响本地倒计时打印）
+  auto_start_poll_seconds: 60
+  # 到点后是否重新拉一次考试列表，确认平台真的放开了窗口
+  auto_start_verify: true
+  # 严格核实：true = 交卷时把「没从网络核实到依据」的答案清空（留空即 0 分）。
+  # 默认 false：宁可填上模型答案博一个对，也不白送 0 分。
+  skip_unverified: false
+  # 每答 N 题发一次 answer/get 心跳；默认 0=关闭（真实前端不轮询，加心跳是新特征）
+  heartbeat_questions: 0
+  # 大模型彻底失败时，选择题兜底猜一个（不猜必 0 分）
+  guess_unanswered: true
+  # paper 里的正确答案由前端用 yibanId 派生 AES 密钥加密（本地判分用）。
+  # true = 优先采用解密出的答案（100% 正确率），没有答案的题继续用模型
+  # false = 只用于本地判分/score 字段，不覆盖模型答案
+  use_answer_key: true
+  # start 被数美验证码拦截时，自动打开真实 take 页让用户完成验证后继续
+  captcha_browser_fallback: true
+
+  # 答案在提交体里的形态。跑 dry_run 后看 data/submit_payload_preview.json，
+  # 对照浏览器 F12 里真实提交请求的格式来定：
+  #   letters         -> "A,C"        （默认）
+  #   letters_array   -> ["A","C"]
+  #   optionid        -> 选项自身 id
+  #   index           -> 选项下标 [0,2]
+  answer_style: letters
+  # 前端交卷时 answer 字段是 JSON.stringify 后的字符串，默认沿用
+  answer_as_json_string: true
+  # 填空题答案形态：array = 按空拆成数组（贴近前端逐空结构）/ string = 原样字符串
+  fill_answer_style: array
+
+llm:
+  base_url: https://api.deepseek.com/v1
+  api_key: ""               # 正式交卷前必填；DeepSeek 控制台申请
+  model: deepseek-flash     # 官方可选：deepseek-flash / deepseek-v4-pro
+  temperature: 0.2
+  concurrency: 3
+  max_retries: 3
+  timeout: 90
+  batch_size: 6
+  # 没有 api_key 时是否允许兜底猜完流程（只建议演练；正式交卷会先拦截）
+  allow_guess_without_key: false
+  # 开考前用一道 1+1 预检模型/key，避免开考后才发现 key 失效
+  preflight: true
+
+  # ---- 网页搜索核实 ----
+  search_enabled: true
+  search_base_url: ""      # 留空沿用上面的 base_url
+  search_count: 8
+  search_need_content: false
+  # 全量核实：true = 每道题都搜一遍再定答案（不只低置信题）。
+  # 题量 50 时大概多花 2~3 分钟；搜不到资料的题会保留模型原答并标记「未核实」。
+  search_all_questions: false
+  # 全量模式下，核实结论达到这个置信度就采纳（不再要求比原答案更自信）
+  search_adopt_confidence: 0.7
+  search_confidence_threshold: 0.75   # 非全量模式下的触发门槛
+  search_max_questions: 15            # 单次最多核几题；0 = 不限
+  search_timeout: 30
+  search_max_seconds: 240  # 搜索核实阶段的总时间预算
+
+humanize:
+  enabled: true
+  min_delay_ms: 2200       # 每题最短"思考"停顿
+  max_delay_ms: 9500       # 每题最长停顿
+  long_think_rate: 0.18
+  long_think_ms: 18000
+  shuffle_submit_order: false
+  idle_before_submit_ms: 3000
+  # 每题平均"占用"时长（秒）。runner 逐题推进，不再"答完再补时"。
+  # 总耗时按对数正态抖动，难度参与分布；不想控就设成 0
+  per_question_seconds: 34
+  # 心跳间隔（秒），0=关闭
+  heartbeat_seconds: 0
+
+http:
+  timeout: 30
+  proxy: null
+  # 纯 HTTP 通道的 UA；启用浏览器写通道后会自动改用浏览器的真实 UA
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36"
+  # 读请求重试（写请求不自动重试，由 runner 核实服务端状态）
+  retries: 2
+  backoff_seconds: 1.2
+  extra_headers: {}
+
+# ---- 专项知识模块 ----
+# 把「某类题目」绑定到「权威来源」。题目命中 keywords 时，不管模型多有把握，
+# 都会先用 DeepSeek /tools/search 搜索 + 直接抓 urls 里的原文，再让模型只依据
+# 原文重判一次。用于学校自出的规章制度类题目（通用模型没见过这些条文）。
+#
+# 命中后依次执行：
+#   1. 搜索：query（留空则用 "规则名 + 题干"），优先采用同站点/同 URL 的结果
+#   2. 抓取：urls 里的页面正文，缓存到 data/module_cache/，默认 7 天有效
+#   3. 重判：只依据材料作答，置信度 >= min_confidence 才覆盖原答案
+modules:
+  enabled: true
+  cache_ttl_hours: 168        # 原文缓存有效期（小时）
+  max_material_chars: 6000    # 单题喂给模型的原文字数上限
+  min_confidence: 0.5         # 采纳门槛
+  max_questions: 20           # 单场最多核几题（0=不限），按置信度从低到高取
+  fetch_timeout: 20           # 抓原文超时（秒）
+
+  rules:
+    - name: 南通师范高等专科学校学生违纪处分条例
+      # 题干/选项里出现任意一个关键词就命中
+      keywords:
+        - 违纪处分条例
+        - 违纪处分
+        - 处分条例
+        - 学生违纪
+        - 违纪行为
+        - 校纪校规
+        - 留校察看
+        - 开除学籍
+      # 权威原文地址（可多条，会全部抓取）
+      urls:
+        - https://xgc.ntnc.edu.cn/2018/1023/c609a18764/page.htm
+      # 搜索用的 query；留空则用「规则名 + 题干」
+      query: 南通师范高等专科学校 学生违纪处分条例
+
+    # 再加一条就复制上面整段，改 name / keywords / urls / query 即可，例如：
+    # - name: 南通师范高等专科学校学生管理规定
+    #   keywords: ["学生管理规定", "学籍管理"]
+    #   urls: ["https://xgc.ntnc.edu.cn/..."]
+    #   query: 南通师范高等专科学校 学生管理规定
+
+# ---- 本地题库 ----
+# 一份答案 TXT（题干 + A/B/C/D + 答案字母）可以转成题库 JSON。拉卷后先跑题库：
+# 题干精确/模糊命中就直接填答案，没命中的题继续走模型、专项模块、搜索核实。
+# 线上选项顺序被打乱也没关系：答案按「选项文本」映射回当前卷面的字母。
+#
+# 生成（生成后自动写入 data/question_bank.json）：
+#   python main.py --build-bank "答案.txt"
+#   python main.py --build-bank 答案.txt --bank data/入学教育.json --bank-name 入学教育
+bank:
+  enabled: true
+  path: ./data/question_bank.json   # 题库文件；也可用 --bank 临时覆盖
+  min_score: 0.86                   # 模糊命中门槛，0.5~1.0
+  overwrite: false                  # true=题库覆盖已有答案（含平台解密答案）
+  # prefer    —— 题库先答，模型只处理没命中的题（省时省钱）
+  # llm_first —— 先让模型把整卷判一遍（推理/搜索都会跑），交卷前用题库校正命中题
+  # staged    —— 题库优先定答 -> 模型二次校验 -> 搜索最多 N 轮 -> 停住等人工核验/交卷
+  #              开启后会强制以题库结论为基线（等价 overwrite=true，人工改过的题除外）
+  mode: staged
